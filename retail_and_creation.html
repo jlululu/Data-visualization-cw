@@ -1,29 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <!DOCTYPE html>
 
 <!--from http://shancarter.github.io/ucb-dataviz-fall-2013/classes/interactive-maps/slider-map.html-->
 <head>
-<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    
     <style>
         body {
             font-family: Helvetica;
         }
 
         #title {
-            margin-left: 50px;
+            margin-left: 0px;
         }
 
         svg {
-            border: solid 1px #ddd;
-            margin-left: 50px;
-            /*margin-top: 5px;*/
+            border:  0px;
+            margin-left: 0px;
+            margin-top: 0px;
         }
 
-        .month {
-            margin-left: 50px;
+        .vis{
+            position:relative;width:800px;height:530px;margin-left: 0px;
         }
+
+         .vis-1{
+             position:absolute;width:290px;height:530px;
+             left:0px;top:0px;
+             border: 4px outset;
+        }
+
+         .vis-2{
+             position:absolute;width:900px;height:500px;
+             left:300px;top:20px;
+         }
 
         .county {
             fill: grey;
@@ -50,10 +63,6 @@
             margin-left: 50px;
         }
 
-        .description{
-            margin-left: 50px;
-        }
-
     </style>
 
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
@@ -67,50 +76,266 @@
 
 <body>
 
-<h1 id="title">Retail and recreation: How did the number of visitors change since the pandemic?</h1>
-<div class="description">
-    <p>
-        Use Python to read the csv file. Remove those regions that are not included in the world.json. Split the date attribute into month and year, groupby the data using country name, month and year attributes, then calculate the average values.
-        Data source links are shown below the map.
-    </p>
+<h2 id="title">Retail and recreation: How did the number of visitors change since the pandemic?</h2>
 </div>
-<h4 class="month"></h4>
-<div class="slider"></div>
-
+<div class="vis">
+    <div class="vis-1">
+        <div class="p1" style="font-style: italic;font-weight: bolder;position:absolute;top:20px;left:10px;">Average cases per month(2020)</div>
+        <div class="'p2" style="font-style: italic;font-weight: bolder;position:absolute;top:300px;left:10px;">Average deaths per month(2020)</div>
+    </div>
+    <div class="vis-2" style="background-color: #dddddd">
+        <div class="month" style="position:absolute;top:1px;left:460px;"></div>
+        <div class="slider" style="position:absolute;top:10px;left:200px;"></div>
+    </div>
+</div>
+<div class="data_source" style="position:relative;left:350px;bottom: 50px;font-size: small">
+    Data source:
+    <a href="https://www.google.com/covid19/mobility/" style="font-size: inherit">Google's global covid-19 community mobility report dataset</a>
+    <a href="https://github.com/holtzy/D3-graph-gallery/blob/master/DATA/world.geojson" style="font-size: inherit">World map dataset</a>
+</div>
 <script>
 
-    var margin = {top: 20, right: 50, bottom: 20, left: 10};
+    // set the dimensions and margins of the graph
+    var margin1 = {top: 80, right: 30, bottom:20, left: 80},
+        width1 = 250 - margin1.left - margin1.right,
+        height1 = 250 - margin1.top - margin1.bottom;
+
+    // append the svg object to the body of the page
+    var svg1 = d3.select(".vis-1")
+        .append("svg")
+        .attr("width", width1 + margin1.left + margin1.right)
+        .attr("height", height1 + margin1.top + margin1.bottom)
+        .append("g")
+        .attr("transform",
+            "translate(" + margin1.left + "," + margin1.top + ")");
+
+    //Read the data
+    d3.csv("covid.csv", function(data) {
+
+        // Add X axis --> it is a date format
+        var x = d3.scaleLinear()
+            .domain([1,12])
+            .range([ 0, width1 ]);
+        svg1.append("g")
+            .attr("transform", "translate(0," + height1 + ")")
+            .call(d3.axisBottom(x));
+
+
+        // Add Y axis
+        var y = d3.scaleLinear()
+            .domain([0, 4000])
+            .range([ height1, 0 ]);
+        svg1.append("g")
+            .call(d3.axisLeft(y));
+
+        // This allows to find the closest X index of the mouse:
+        var bisect = d3.bisector(function(d) { return d.month; }).left;
+
+        // Create the circle that travels along the curve of chart
+        var focus = svg1
+            .append('g')
+            .append('circle')
+            .style("fill", "none")
+            .attr("stroke", "black")
+            .attr('r', 8.5)
+            .style("opacity", 0)
+
+        // Create the text that travels along the curve of chart
+        var focusText = svg1
+            .append('g')
+            .append('text')
+            .style("opacity", 0)
+            .style("font-size","small")
+            .style("font-weight","bold")
+            .attr("text-anchor", "left")
+            .attr("alignment-baseline", "left")
+
+        // Add the line
+        svg1
+            .append("path")
+            .datum(data)
+            .attr("fill", "none")
+            .attr("stroke", "blue")
+            .attr("stroke-width", 1.5)
+            .attr("d", d3.line()
+                .x(function(d) { return x(d.month) })
+                .y(function(d) { return y(d.cases) })
+            )
+
+        // Create a rect on top of the svg area: this rectangle recovers mouse position
+        svg1
+            .append('rect')
+            .style("fill", "none")
+            .style("pointer-events", "all")
+            .attr('width', width1)
+            .attr('height', height1)
+            .on('mouseover', mouseover)
+            .on('mousemove', mousemove)
+            .on('mouseout', mouseout);
+
+
+        // What happens when the mouse move -> show the annotations at the right positions.
+        function mouseover() {
+            focus.style("opacity", 1)
+            focusText.style("opacity",1)
+        }
+
+        function mousemove() {
+            // recover coordinate we need
+            var x0 = x.invert(d3.mouse(this)[0]);
+            var i = bisect(data, x0, 1);
+            var date = ["Jan. 2020","Feb. 2020","Mar. 2020","Apr. 2020","May 2020","Jun. 2020","Jul. 2020","Aug. 2020","Sept. 2020","Oct. 2020","Nov. 2020","Dec. 2020"]
+            selectedData = data[i]
+            focus
+                .attr("cx", x(selectedData.month))
+                .attr("cy", y(selectedData.cases))
+            focusText
+                .html(date[selectedData.month - 1]+":"+selectedData.cases)
+                .attr("x", x(selectedData.month)-50)
+                .attr("y", y(selectedData.cases)-20)
+        }
+        function mouseout() {
+            focus.style("opacity", 0)
+            focusText.style("opacity", 0)
+        }
+    })
+
+    //deaths
+    // set the dimensions and margins of the graph
+    var margin2 = {top: 100, right: 30, bottom: 50, left: 80},
+        width2 = 250 - margin2.left - margin2.right,
+        height2 = 300 - margin2.top - margin2.bottom;
+
+    // append the svg object to the body of the page
+    var svg2 = d3.select(".vis-1")
+        .append("svg")
+        .attr("width", width2 + margin2.left + margin2.right)
+        .attr("height", height2 + margin2.top + margin2.bottom)
+        .append("g")
+        .attr("transform",
+            "translate(" + margin2.left + "," + margin2.top + ")");
+
+    //Read the data
+    d3.csv("covid.csv", function(data) {
+
+        // Add X axis --> it is a date format
+        var x1 = d3.scaleLinear()
+            .domain([1,12])
+            .range([ 0, width2 ]);
+        svg2.append("g")
+            .attr("transform", "translate(0," + height2 + ")")
+            .call(d3.axisBottom(x1));
+
+        // Add Y axis
+        var y1 = d3.scaleLinear()
+            .domain([0, 80])
+            .range([ height2, 0 ]);
+        svg2.append("g")
+            .call(d3.axisLeft(y1));
+
+        // This allows to find the closest X index of the mouse:
+        var bisect1 = d3.bisector(function(d) { return d.month; }).left;
+
+        // Create the circle that travels along the curve of chart
+        var focus1 = svg2
+            .append('g')
+            .append('circle')
+            .style("fill", "none")
+            .attr("stroke", "black")
+            .attr('r', 8.5)
+            .style("opacity", 0)
+
+        // Create the text that travels along the curve of chart
+        var focusText1 = svg2
+            .append('g')
+            .append('text')
+            .style("opacity", 0)
+            .style("font-size","small")
+            .style("font-weight","bold")
+            .attr("text-anchor", "left")
+            .attr("alignment-baseline", "left")
+
+        // Add the line
+        svg2
+            .append("path")
+            .datum(data)
+            .attr("fill", "none")
+            .attr("stroke", "red")
+            .attr("stroke-width", 1.5)
+            .attr("d", d3.line()
+                .x(function(d) { return x1(d.month) })
+                .y(function(d) { return y1(d.deaths) })
+            )
+
+        // Create a rect on top of the svg area: this rectangle recovers mouse position
+        svg2
+            .append('rect')
+            .style("fill", "none")
+            .style("pointer-events", "all")
+            .attr('width', width2)
+            .attr('height', height2)
+            .on('mouseover', mouseover1)
+            .on('mousemove', mousemove1)
+            .on('mouseout', mouseout1);
+
+
+        // What happens when the mouse move -> show the annotations at the right positions.
+        function mouseover1() {
+            focus1.style("opacity", 1)
+            focusText1.style("opacity",1)
+        }
+
+        function mousemove1() {
+            // recover coordinate we need
+            var x0 = x1.invert(d3.mouse(this)[0]);
+            var i = bisect1(data, x0, 1);
+            var date = ["Jan. 2020","Feb. 2020","Mar. 2020","Apr. 2020","May 2020","Jun. 2020","Jul. 2020","Aug. 2020","Sept. 2020","Oct. 2020","Nov. 2020","Dec. 2020"]
+            selectedData = data[i]
+            focus1
+                .attr("cx", x1(selectedData.month))
+                .attr("cy", y1(selectedData.deaths))
+            focusText1
+                .html(date[selectedData.month - 1]+":"+selectedData.deaths)
+                .attr("x", x1(selectedData.month)-50)
+                .attr("y", y1(selectedData.deaths)-20)
+        }
+        function mouseout1() {
+            focus1.style("opacity", 0)
+            focusText1.style("opacity", 0)
+        }
+    })
+
+    var margin = {top: 0, right: 0, bottom: 0, left: 0};
     width = 900 - margin.left - margin.right,
-        height = 700 - margin.top - margin.bottom;
+        height = 600 - margin.top - margin.bottom;
 
     var curr_m, curr_y;
 
     var month_list = ["February 2020","March 2020","April 2020","May 2020","June 2020","July 2020","August 2020","September 2020","October 2020","November 2020","December 2020","January 2021","February 2021","March 2021"];
 
-    var color_domain = [-80,-70,-60,-50,-40,-30,-20,-10,0,5,10,15,20,25,30,35,40];
+    var color_domain = [-80,-75,-70,-65,-60,-55,-50,-45,-40,-35,-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30,35,40];
 
-    var legend_labels = ["<=-80%","-70%","-60","-50%","-40%","-30%","-20%","-10%","0%","5%","10%","15%","20%","25%","30%","35%",">=40%"];
+    var legend_labels = ["-80%","0%","40%"];
 
     var color = d3.scale.threshold()
         .domain(color_domain)
 
         .range([
-            "#2F0000","#4D0000","#750000","#AE0000","#EA0000",
-            "#FF0000","#FF5151","#FF7575","#FF9797",
+            '#613030','#2F0000','#4D0000','#600000','#750000','#930000','#AE0000','#CE0000','#EA0000','#FF0000','#FF2D2D','#FF5151','#ff7575','#FF9797','#FFB5B5','#FFD2D2','#FFECEC',
             "#ECF5FF",
             "#C4E1FF","#97CBFF","#84C1FF","#66B3FF","#46A3FF","#2894FF","#0080FF","#0072E3"
 
         ]);
 
-    var svg = d3.select("body").append("svg")
+    var svg = d3.select(".vis-2").append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
     queue()
-        .defer(d3.csv, "https://raw.githubusercontent.com/jlululu/Data-visualization-cw/main/retail_and_creation.csv")
-        .defer(d3.json, "https://raw.githubusercontent.com/jlululu/Data-visualization-cw/main/world.json")
+        .defer(d3.csv, "retail_and_creation.csv")
+        .defer(d3.json, "world.json")
         .await(ready);
 
     function ready(error, data, ca) {
@@ -142,7 +367,7 @@
         var path = d3.geoPath()
             .projection(projection);
 
-        var Tooltip = d3.select("body")
+        var Tooltip = d3.select(".vis-2")
             .append("div")
             .style("opacity", 0)
             .attr("class", "tooltip")
@@ -218,8 +443,8 @@
                     return color(c)
                 }
                 catch(e){
-                        return "gray"
-                    }
+                    return "gray"
+                }
             });
         }
 
@@ -244,23 +469,25 @@
     var ls_w = 20, ls_h = 17;
 
     legend.append("rect")
-        .attr("x", 20)
-        .attr("y", function(d, i){ return (i*ls_h) + 2*ls_h - 50;})
+        .attr("y", 60)
+        .attr("x", function(d, i){ return (i*ls_h) + 2*ls_h +150;})
         .attr("width", ls_w)
         .attr("height", ls_h)
         .style("fill", function(d, i) { return color(d); })
         .style("opacity", 0.8);
 
     legend.append("text")
-        .attr("x", 50)
-        .attr("y", function(d, i){ return (i*ls_h) + ls_h - 20;})
+        .attr("y", 60)
+        .attr("x", function(d, i){
+            if(i == 0)
+                return (i*ls_h) + 2*ls_h + 140;
+            if(i == 1)
+                return 452;
+            return 595;
+        })
         .text(function(d, i){ return legend_labels[i]; });
 
+
 </script>
-<h6 class="description">
-    Data source:
-    <a href="https://www.google.com/covid19/mobility/" style="font-size: inherit">Google's global covid-19 community mobility report dataset</a>
-    <a href="https://github.com/holtzy/D3-graph-gallery/blob/master/DATA/world.geojson" style="font-size: inherit">World map dataset</a>
-</h6>
 </body>
 </html>
